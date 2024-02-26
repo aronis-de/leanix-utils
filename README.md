@@ -44,7 +44,7 @@ In order to access the LeanIX API in a browser outside of leanix.net, we need to
 # Snapshot Helper
 
 ## Configuration
-Open the file config.ini and add the following parameters:
+Copy the file config.example.ini to config.ini and add the following parameters:
 * API token of production workspace
 * Workspace ID of production workspace
 * LeanIX instance URL of your company
