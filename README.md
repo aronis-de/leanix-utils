@@ -19,7 +19,11 @@ Currently contains the following LeanIX helpers:
 # Getting started
 Clone the source files to your server or local IDE:
 
-    git clone https://github.com/fnc-eam/leanix-utils.git
+```bash
+git clone https://github.com/fnc-eam/leanix-utils.git
+cd snapshot
+pip install -r requirements.txt
+```
 
 # News Feed
 
