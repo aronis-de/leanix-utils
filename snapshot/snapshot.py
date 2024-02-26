@@ -118,21 +118,25 @@ class LeanIX:
         print("Downloading surveys...")
         request_url = self.instance + self.poll_url + "/polls"
         params = {'workspaceId': self.config['MANDATORY']['WORKSPACEID']}
-        survey_ids = self.access_leanix_api(request_url, params=params).json()["data"]
+        try:
+            survey_ids = self.access_leanix_api(request_url, params=params).json()["data"]
+    
+            #get all survey runs
+            for survey in [x["id"] for x in survey_ids]:
+                run_url = self.instance + self.poll_url + "/polls/" + survey + "/pollRuns"
+                runs = self.access_leanix_api(run_url, params=params).json()["data"]
 
-        #get all survey runs
-        for survey in [x["id"] for x in survey_ids]:
-            run_url = self.instance + self.poll_url + "/polls/" + survey + "/pollRuns"
-            runs = self.access_leanix_api(run_url, params=params).json()["data"]
-
-            #get all run results
-            for run in [y['id'] for y in runs]:
-                print("Survey " + survey + " - Run " + run)
-                result_url = self.instance + self.poll_url + "/pollRuns/" + run + "/poll_results.xlsx"
-                file = self.access_leanix_api(result_url, params=params)
-                filename = self.config['OPTIONAL']['SURVEY_FILENAME'].replace("{cdate}", self.get_today_date()).replace("{id}", survey).replace("{run}", run)
-                with open(filename,'wb') as survey_run_result:
-                    survey_run_result.write(file.content)
+                #get all run results
+                for run in [y['id'] for y in runs]:
+                    print("Survey " + survey + " - Run " + run)
+                    result_url = self.instance + self.poll_url + "/pollRuns/" + run + "/poll_results.xlsx"
+                    file = self.access_leanix_api(result_url, params=params)
+                    filename = self.config['OPTIONAL']['SURVEY_FILENAME'].replace("{cdate}", self.get_today_date()).replace("{id}", survey).replace("{run}", run)
+                    with open(filename,'wb') as survey_run_result:
+                        survey_run_result.write(file.content)
+        except requests.exceptions.HTTPError as err:
+            print(f'Error while downloading surveys: {err}')
+            return
 
 
 ########################################
