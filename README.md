@@ -14,13 +14,13 @@ Currently contains the following LeanIX helpers:
       Survey a7afaa28-55b8-4a83-9d90 - Run b5b6a33c-0999-4a2e-9aa6
 
 * A __news-feed__ web page providing an overview on the recent changes within your workspace
-![News feed screenshot](https://github.com/fnc-eam/leanix-utils/blob/master/news-feed.jpg)
+![News feed screenshot](https://github.com/aronis-de/leanix-utils/blob/master/news-feed.jpg)
 
 # Getting started
 Clone the source files to your server or local IDE:
 
 ```bash
-git clone https://github.com/fnc-eam/leanix-utils.git
+git clone https://github.com/aronis-de/leanix-utils.git
 cd snapshot
 pip install -r requirements.txt
 ```
