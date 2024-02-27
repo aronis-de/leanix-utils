@@ -19,7 +19,11 @@ Currently contains the following LeanIX helpers:
 # Getting started
 Clone the source files to your server or local IDE:
 
-    git clone https://github.com/fnc-eam/leanix-utils.git
+```bash
+git clone https://github.com/fnc-eam/leanix-utils.git
+cd snapshot
+pip install -r requirements.txt
+```
 
 # News Feed
 
@@ -40,7 +44,7 @@ In order to access the LeanIX API in a browser outside of leanix.net, we need to
 # Snapshot Helper
 
 ## Configuration
-Open the file config.ini and add the following parameters:
+Copy the file config.example.ini to config.ini and add the following parameters:
 * API token of production workspace
 * Workspace ID of production workspace
 * LeanIX instance URL of your company

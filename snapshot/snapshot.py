@@ -22,6 +22,7 @@ class LeanIX:
         self.poll_url = "/services/poll/v2"
         self.apitoken = self.config['MANDATORY']['APITOKEN']
         self.header = None
+        self.timeout = 7200
 
         #proxy
         http_proxy = self.config['MANDATORY']['HTTP_PROXY']
@@ -78,35 +79,60 @@ class LeanIX:
 
         #trigger export
         trigger_export_url = self.instance + self.base_path + "/exports/fullExport"
-        self.access_leanix_api(trigger_export_url, method="POST", params={'exportType': 'SNAPSHOT'})
+        trigger_export_response = self.access_leanix_api(trigger_export_url, method="POST", params={'exportType': 'SNAPSHOT'}).json()
+        job_id = trigger_export_response['data']['jobId']
+        print("Job ID: ", job_id)
         print("Waiting for snapshot to complete, this may take some time...")
 
-        #get download key
+        #check job status and wait for download key
+        status_check_url = self.instance + self.base_path + "/jobs/" + job_id + "/status"
         status = None
-        request_key_url = self.instance + self.base_path + "/exports"
-        key_params = {'pageSize': 40, 'sorting': 'createdAt', 'sortDirection': "DESC"}
+        waiting_since = 0
+        workspace_id = None
 
-        while status != "COMPLETED":
+        while status != "DONE" and waiting_since < self.timeout:
             self.connect() #refreshing the access token in case that the export takes longer than the validity of the token
-            data = self.access_leanix_api(request_key_url, params=key_params, data=json.dumps({'exportType': 'SNAPSHOT'})).json()
-            download_key = data["data"][0]["downloadKey"]
-            status = data["data"][0]["status"]
+            job_status_response = self.access_leanix_api(status_check_url).json()
+            status = job_status_response["data"]["status"]
+            workspace_id = job_status_response["data"]["workspaceId"]
+            print("Status: ", status, "Progress:", job_status_response["data"]["processed"],'/',job_status_response["data"]["total"])
+            waiting_since += 5
             time.sleep(5)
+        
+        if waiting_since >= self.timeout:
+            print("Timeout exceeded. Snapshot not completed.")
+            return False
 
+        # request download key
+        request_key_url = self.instance + self.base_path + "/exports"
+        key_params = {'exportType':"SNAPSHOT", 'pageSize': 1, 'sorting': 'createdAt', 'sortDirection': "DESC"}
 
+        data = self.access_leanix_api(request_key_url, params=key_params, data=json.dumps({'exportType': 'SNAPSHOT'})).json()
+        status = data["data"][0]["status"]
+        download_key = data["data"][0]["downloadKey"]
+
+        if status != 'COMPLETED':
+            print("Snapshot not completed. Status: ", status)
+            return False
+        
         #request and store data
         print("Snapshot completed. Downloading...")
-        download_url = self.instance + self.base_path + "/exports" + "/downloads/" + self.config['MANDATORY']['WORKSPACEID']
-        self.header["Accept"] = "application/octet-stream"
-        binary = self.access_leanix_api(download_url, params={'key': download_key}, stream=True)
+        download_url = self.instance + self.base_path + "/exports/downloads/" + workspace_id
 
-        #write to file
-        filename = self.config['OPTIONAL']['EXPORT_FILENAME'].replace("{cdate}", self.get_today_date())
-        if binary.status_code == 200:
-            with open(filename, 'wb') as file:
-                for x in binary.iter_content(1024):
-                    file.write(x)
-        print("Saved to file ", filename)
+        self.header["Accept"] = "application/octet-stream"
+        try:
+            binary = self.access_leanix_api(download_url, params={'key': download_key}, stream=True)
+            #write to file
+            filename = self.config['OPTIONAL']['EXPORT_FILENAME'].replace("{cdate}", self.get_today_date())
+            print("Writing snapshot to ",filename)
+            if binary.status_code == 200:
+                with open(filename, 'wb') as file:
+                    for x in binary.iter_content(1024):
+                        file.write(x)
+            print("Saved to file ", filename)
+        except requests.exceptions.HTTPError as err:
+            print(f'Error while downloading snapshot: {err}')
+            return
         del self.header["Accept"]
 
     def download_surveys(self):
@@ -118,21 +144,25 @@ class LeanIX:
         print("Downloading surveys...")
         request_url = self.instance + self.poll_url + "/polls"
         params = {'workspaceId': self.config['MANDATORY']['WORKSPACEID']}
-        survey_ids = self.access_leanix_api(request_url, params=params).json()["data"]
+        try:
+            survey_ids = self.access_leanix_api(request_url, params=params).json()["data"]
+    
+            #get all survey runs
+            for survey in [x["id"] for x in survey_ids]:
+                run_url = self.instance + self.poll_url + "/polls/" + survey + "/pollRuns"
+                runs = self.access_leanix_api(run_url, params=params).json()["data"]
 
-        #get all survey runs
-        for survey in [x["id"] for x in survey_ids]:
-            run_url = self.instance + self.poll_url + "/polls/" + survey + "/pollRuns"
-            runs = self.access_leanix_api(run_url, params=params).json()["data"]
-
-            #get all run results
-            for run in [y['id'] for y in runs]:
-                print("Survey " + survey + " - Run " + run)
-                result_url = self.instance + self.poll_url + "/pollRuns/" + run + "/poll_results.xlsx"
-                file = self.access_leanix_api(result_url, params=params)
-                filename = self.config['OPTIONAL']['SURVEY_FILENAME'].replace("{cdate}", self.get_today_date()).replace("{id}", survey).replace("{run}", run)
-                with open(filename,'wb') as survey_run_result:
-                    survey_run_result.write(file.content)
+                #get all run results
+                for run in [y['id'] for y in runs]:
+                    print("Survey " + survey + " - Run " + run)
+                    result_url = self.instance + self.poll_url + "/pollRuns/" + run + "/poll_results.xlsx"
+                    file = self.access_leanix_api(result_url, params=params)
+                    filename = self.config['OPTIONAL']['SURVEY_FILENAME'].replace("{cdate}", self.get_today_date()).replace("{id}", survey).replace("{run}", run)
+                    with open(filename,'wb') as survey_run_result:
+                        survey_run_result.write(file.content)
+        except requests.exceptions.HTTPError as err:
+            print(f'Error while downloading surveys: {err}')
+            return
 
 
 ########################################
